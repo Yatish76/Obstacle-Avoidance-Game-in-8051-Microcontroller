@@ -1,0 +1,89 @@
+C51 COMPILER V9.60.0.0   SERIAL                                                            04/04/2021 03:34:04 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE SERIAL
+OBJECT MODULE PLACED IN .\Objects\serial.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE serial.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\se
+                    -rial.lst) TABS(2) OBJECT(.\Objects\serial.obj)
+
+line level    source
+
+   1          #include <at89c5131.h>
+   2          
+   3          bit rx_complete = 0; //Bit flags for interrupts
+   4          
+   5          /**********************************************************
+   6             uart_init(): 
+   7            Initialization function to be completed
+   8            Initializes UART peripheral for 8-bit transfer, 
+   9            1 start and 1 stop bits. 
+  10            
+  11            Please write TH1 value for required baud rate
+  12          ***********************************************************/  
+  13          void uart_init(void)
+  14          {
+  15   1        TMOD=0x21;      //Configure Timer 1 in Mode 2 and Timer 0 in mode 1
+  16   1        TH1=243;          //Load TH1 to obtain require Baudrate (Refer Serial.pdf for calculations)
+  17   1        SCON=0x50;      //Configure UART peripheral for 8-bit data transfer 
+  18   1                    //Start Timer 1
+  19   1        ES=1;                 //Enable Serial Interrupt
+  20   1        EA=1; 
+  21   1        TR0=1 ; 
+  22   1        TR1=1 ;   //Enable Global Interrupt
+  23   1      }
+  24          
+  25          
+  26          
+  27          
+  28          
+  29          
+  30          
+  31          
+  32          
+  33          /**********************************************************
+  34             receive_char(): 
+  35            Receives a character through UART. Returns a 
+  36            character.
+  37          ***********************************************************/    
+  38          unsigned char receive_char(void)
+  39          {
+  40   1        unsigned char ch = 0;
+  41   1        if(rx_complete==1);       //Wait for rx_complete(interrupt to complete)
+  42   1        rx_complete = 0;
+  43   1        ch = SBUF;          //Read data from SBUF
+  44   1        return ch;          //Return read character
+  45   1      }
+  46          
+  47          
+  48          /**********************************************************
+  49             Serial_ISR(): 
+  50            Interrupt service routine for UART interrupt.
+  51            Determines whether it is a transmit or receive
+  52            interrupt and raise corresponding flag.
+  53            Transmit or receive functions (defined above) monitor
+  54            for these flags to check if data transfer is done.
+C51 COMPILER V9.60.0.0   SERIAL                                                            04/04/2021 03:34:04 PAGE 2   
+
+  55          ***********************************************************/  
+  56          void serial_ISR(void) interrupt 4
+  57          {
+  58   1           if(RI==1)      //check whether RI is set
+  59   1          {
+  60   2            RI = 0;     //Clear RI flag
+  61   2            rx_complete = 1;  //Set rx_complete flag indicating interrupt completion
+  62   2          }
+  63   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     31    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,272 @@
+C51 COMPILER V9.60.0.0   EE337_PROJECT                                                     04/12/2021 12:42:55 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE EE337_PROJECT
+OBJECT MODULE PLACED IN .\Objects\EE337_Project.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE EE337_Project.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\List
+                    -ings\EE337_Project.lst) TABS(2) OBJECT(.\Objects\EE337_Project.obj)
+
+line level    source
+
+   1          #include <at89c5131.h>
+   2          #include "lcd.h"    //Header file with LCD interfacing functions
+   3          #include "serial.c" //C file with UART interfacing functions
+   4          
+   5          
+   6          bit b2=0, b1=0, b0=1;                     //state bits to store the value of current obstacle configuratio
+             -n
+   7          bit b_2=0,b_1=0,b_0=0;                    //temporary states for carrying operations 
+   8          
+   9          
+  10          
+  11          void next_state (void);                   //function to generate next state of obstacle
+  12          void shift_obstacle(void) ;               //function to shift the obstacles to left by one LCD cell
+  13          void game_over(void);                     //function to be called after 'D' and '*' occupies same position
+  14          void send_all_char(void);                 //function use to send characters to lcd
+  15          void reset_lcd(void);                     //function to set lcd to default value
+  16          
+  17          unsigned int current_score=0;
+  18          unsigned int high_score=0;
+  19          unsigned char d_location=0x82 ;
+  20          unsigned char lfsr_count=0;
+  21          unsigned char lcd_add_1[20] = {32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32} ;
+  22          unsigned char lcd_add_2[20] = {32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32} ;
+  23          
+  24            void lcd_score(void)                     //function to show the strings "score:" and "high score:" on lcd
+  25          {
+  26   1         lcd_cmd(0x80);
+  27   1         lcd_write_string("Score:");
+  28   1         lcd_cmd (0xC0) ;
+  29   1         lcd_write_string("High Score:");
+  30   1         
+  31   1      } 
+  32          
+  33          
+  34          void main(void)
+  35          {
+  36   1        
+  37   1        
+  38   1        lcd_add_1[16]=32 ;                            //assigning obstacle corresponding to configuration no.1
+  39   1        lcd_add_1[17]=42 ;
+  40   1        lcd_add_1[18]=42 ;
+  41   1        lcd_init();                                   //initialising lcd for printing characters
+  42   1        uart_init();                                  //initialising UART for serial datas transfer
+  43   1        lcd_cmd (0x82);
+  44   1        lcd_write_char('D');
+  45   1        
+  46   1        
+  47   1        while(1)                                          //loops continuosly forever
+  48   1        {    
+  49   2          
+  50   2             msdelay(1000);                               //delay of 1 sec
+  51   2             if(d_locate==1){                             //assigning value to d_location according to latest key 
+             -pressed
+  52   3                d_location=0x82;}
+C51 COMPILER V9.60.0.0   EE337_PROJECT                                                     04/12/2021 12:42:55 PAGE 2   
+
+  53   2             if(d_locate==0){
+  54   3                d_location=0xc2;}
+  55   2             lcd_cmd(d_location);
+  56   2             lcd_write_char(68);
+  57   2                
+  58   2             current_score++ ;                               //updating the current score on the basis of time elap
+             -sed in econd
+  59   2             
+  60   2             if(lfsr_count==3){                              //lfsr count shows the time elapsed after last obst
+             -acle configuration update
+  61   3                lfsr_count=0;
+  62   3                next_state();                                //after every 3 sec we load new obstacle configuratio
+             -n at the end of array
+  63   3             }      
+  64   2             shift_obstacle();                               //we shift the values store in lcd_array by 1 to left
+  65   2             lfsr_count++ ;
+  66   2             if ((lcd_add_1[d_location-128]==42) || (lcd_add_2[d_location-192]==42) ){               //checking fo
+             -r game over
+  67   3                 ES=0;                                                                               //disabling 
+             -the serial interrupts during score display
+  68   3                 current_score-- ;
+  69   3                 if(current_score > high_score){                                                     //updating the 
+             -new high score
+  70   4                     high_score=current_score ;
+  71   4                 }
+  72   3                 game_over();                                //calling game over function which displays the current
+             - score and high score
+  73   3                 reset_lcd();                                //reset function resets lcd screen and puts 'D' at 1st l
+             -ine 3rd row position 
+  74   3                 current_score=0;                            //resetting current score to value 0
+  75   3                 lfsr_count=0 ;
+  76   3                 next_state();                               //next state is preserved for the next game
+  77   3                 ES=1;                                       //enabling the serial interrupts again
+  78   3                 
+  79   3             }
+  80   2             
+  81   2             send_all_char ();                               //send all characters store in lcd_array to lcd screen
+  82   2             
+  83   2            
+  84   2          
+  85   2          } 
+  86   1        }
+  87          
+  88          
+  89          void game_over(void){                                       //game over function
+  90   1        
+  91   1                 unsigned char curr_score_array[5];               //temporary array to store digits of score
+  92   1                 unsigned char high_score_array[5];               
+  93   1                 int i;
+  94   1                 lcd_cmd(0x01);                                   //clear lcd screen
+  95   1                 lcd_score();
+  96   1                 int_to_string(current_score, curr_score_array);  //converting integer to string
+  97   1                 int_to_string(high_score, high_score_array);     //converting integer to string
+  98   1        
+  99   1                 
+ 100   1                 for(i=0;i<5;i++){                                //sending the score to lcd 
+ 101   2                    
+ 102   2                    lcd_cmd(0x8B + i);
+ 103   2                    lcd_write_char(curr_score_array[i]);
+ 104   2                    lcd_cmd(0xCB + i);
+ 105   2                    lcd_write_char(high_score_array[i]);
+ 106   2                 }
+C51 COMPILER V9.60.0.0   EE337_PROJECT                                                     04/12/2021 12:42:55 PAGE 3   
+
+ 107   1                 d_location=0x82;                                //updating d_location value with default value
+ 108   1                 msdelay(3000);
+ 109   1                 lcd_cmd(0x01);                                  //clear lcd screen
+ 110   1                 
+ 111   1                 
+ 112   1      }
+ 113          
+ 114          
+ 115          
+ 116          void reset_lcd(void){                                     //reset lcd function
+ 117   1         int k;
+ 118   1         for(k=0;k<20;k++){                                     //storing space character in every position of lc
+             -d_array
+ 119   2            lcd_add_1[k]=32;                                    //ASCII value of space=32
+ 120   2            lcd_add_2[k]=32;
+ 121   2         }
+ 122   1         d_locate=1 ;                                           //'D' in 1st row, 3rd column
+ 123   1         
+ 124   1      } 
+ 125          
+ 126          void next_state (void) {                                  //next state function
+ 127   1        
+ 128   1        
+ 129   1        unsigned char temp_b ;                                  //declaring character for generating switch cases
+ 130   1        b_0=b1 ;                                                //assigning updated values to state bits accordin
+             -g to given LFSR for pseudo randomness
+ 131   1        temp_b = b_0 ;
+ 132   1        b_1=b2 ;
+ 133   1        temp_b = temp_b + 2*b_1 ;
+ 134   1        b_2= b2^b0 ;
+ 135   1        temp_b = temp_b + 4*b_2 ;                               //calculating temp_b from the next state values
+ 136   1        b0=b_0 ;
+ 137   1        b1=b_1 ;
+ 138   1        b2=b_2 ;
+ 139   1        
+ 140   1        switch(temp_b){                                        //choosing obstacle configuration on the basis of
+             - next state bits
+ 141   2        
+ 142   2          case 1 :  lcd_add_1[16]=32 ;                         //configuaration 1    " **"
+ 143   2                    lcd_add_1[17]=42 ;                         //                    "   "
+ 144   2                    lcd_add_1[18]=42 ;
+ 145   2                    lcd_add_2[16]=32 ;
+ 146   2                    lcd_add_2[17]=32 ;
+ 147   2                    lcd_add_2[18]=32 ;
+ 148   2                    break;
+ 149   2                    
+ 150   2          
+ 151   2          case 2 :  lcd_add_2[16]=32 ;                         //configuration 2    "   "
+ 152   2                    lcd_add_2[17]=42 ;                         //                   " **"
+ 153   2                    lcd_add_2[18]=42 ;
+ 154   2                    lcd_add_1[16]=32 ;
+ 155   2                    lcd_add_1[17]=32 ;
+ 156   2                    lcd_add_1[18]=32 ;
+ 157   2                    break;
+ 158   2          
+ 159   2          case 3 :  lcd_add_1[16]=32 ;                         //configuration 3    " * "
+ 160   2                    lcd_add_1[17]=42 ;                         //                   "   "
+ 161   2                    lcd_add_1[18]=32 ;
+ 162   2                    lcd_add_2[16]=32 ;
+ 163   2                    lcd_add_2[17]=32 ;
+ 164   2                    lcd_add_2[18]=32 ;
+ 165   2                    break;
+C51 COMPILER V9.60.0.0   EE337_PROJECT                                                     04/12/2021 12:42:55 PAGE 4   
+
+ 166   2          
+ 167   2          case 4 :  lcd_add_2[16]=32 ;                         //configuration 4    "   "
+ 168   2                    lcd_add_2[17]=32 ;                         //                   "  *"
+ 169   2                    lcd_add_2[18]=42 ;
+ 170   2                    lcd_add_1[16]=32 ;
+ 171   2                    lcd_add_1[17]=32 ;
+ 172   2                    lcd_add_1[18]=32 ;
+ 173   2                    break;
+ 174   2          
+ 175   2          case 5 :  lcd_add_2[16]=32 ;                         //configuration 5    "   "
+ 176   2                    lcd_add_2[17]=42 ;                         //                   " * "
+ 177   2                    lcd_add_2[18]=32 ;
+ 178   2                    lcd_add_1[16]=32 ;
+ 179   2                    lcd_add_1[17]=32 ;
+ 180   2                    lcd_add_1[18]=32 ;
+ 181   2                    break;
+ 182   2          
+ 183   2          case 6 :  lcd_add_1[16]=32 ;                         //configuration 6    "  *"
+ 184   2                    lcd_add_1[17]=32 ;                         //                   "   "
+ 185   2                    lcd_add_1[18]=42 ;
+ 186   2                    lcd_add_2[16]=32 ;
+ 187   2                    lcd_add_2[17]=32 ;
+ 188   2                    lcd_add_2[18]=32 ;
+ 189   2                    break;
+ 190   2                    
+ 191   2          case 7 :  lcd_add_1[16]=32 ;                         //configuration 7    "   "
+ 192   2                    lcd_add_1[17]=32 ;                         //                   "   "
+ 193   2                    lcd_add_1[18]=32 ;          
+ 194   2                    lcd_add_2[16]=32 ;
+ 195   2                    lcd_add_2[17]=32 ;
+ 196   2                    lcd_add_2[18]=32 ;
+ 197   2                    break;
+ 198   2          
+ 199   2        } 
+ 200   1        
+ 201   1        
+ 202   1      }   
+ 203          
+ 204          void shift_obstacle(void){                              //shift obstacle function
+ 205   1         int j;
+ 206   1         for (j=0;j<19;j++){                                  //shifting every element in the array to left by on
+             -e place
+ 207   2            lcd_add_1[j]=lcd_add_1[j+1];
+ 208   2            lcd_add_2[j]=lcd_add_2[j+1];
+ 209   2         }
+ 210   1         
+ 211   1      }
+ 212          
+ 213          void send_all_char(void){                               //send all characters function
+ 214   1         unsigned int m;
+ 215   1         
+ 216   1         for (m=0;m<16;m++){                                  //sending the characters stored in lcd_array i.e. l
+             -cd_add_1 and lcd_add_2 to the lcd
+ 217   2            lcd_cmd(m + 0x80);
+ 218   2            lcd_write_char(lcd_add_1[m]);
+ 219   2            lcd_cmd(m + 0xc0);
+ 220   2            lcd_write_char(lcd_add_2[m]);
+ 221   2             
+ 222   2         }
+ 223   1         lcd_cmd(d_location);                                 //1st row and 2nd column is always occupied by 'D'
+ 224   1         lcd_write_char(68);   
+ 225   1      }
+C51 COMPILER V9.60.0.0   EE337_PROJECT                                                     04/12/2021 12:42:55 PAGE 5   
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1026    ----
+   CONSTANT SIZE    =     19    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     46      18
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      7    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
